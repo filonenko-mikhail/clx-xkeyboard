@@ -1,0 +1,20 @@
+http://www.x.org/docs/XKB/XKBproto.pdf for common lisp clx library.
+Implementation of small part of XKeyboard extension as described by
+
+** Installation
+
+#+BEGIN_VERSE
+git clone http://github.com/filonenko-mikhail/clx-xkeyboard.git --depth 1
+#+END_VERSE
+
+For storing keyboard layout in Stumpwm window manager add to your =~/.stumpwmrc=.
+
+#+BEGIN_SRC lisp
+(pushnew "/path/to/clx-xkeyboard/" asdf:*central-registry*)
+(load "/path/to/clx-xkeyboard/test/stumpperwindowlayout.lisp")
+
+(run-commands "enable-per-window-layout")
+#+END_SRC
+
+
+Written by Michael Filonenko <filonenko.mikhail@gmail.com>
