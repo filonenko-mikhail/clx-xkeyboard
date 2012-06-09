@@ -21,7 +21,6 @@
 (defun group-focus-changed (group previous-group)
   (let ((previous-window (stumpwm::group-current-window previous-group))
         (window (stumpwm::group-current-window group)))
-    (format t "prev w ~a next w ~a~%" previous-window window)
     (window-focus-changed window previous-window)))
 
 
