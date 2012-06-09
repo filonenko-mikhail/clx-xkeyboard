@@ -8,28 +8,31 @@
   :events () 
   :errors (xkeyboard-error))
 
-(export '+use-core-kbd+
-        '+use-core-ptr+
-        'xkeyboard-error
-        #:device-state
-        #:make-device-state
-        #:device-state-p
-        #:copy-device-state
-        #:device-state-device-id
-        #:device-state-mods
-        #:device-state-base-mods
-        #:device-state-latched-mods
-        #:device-state-locked-mods
-        #:device-state-group
-        #:device-state-locked-group
-        #:device-state-base-group
-        #:device-state-latched-group
-        #:device-state-compat-state
-        #:device-state-grab-mods
-        #:device-state-compat-grab-mods
-        #:device-state-lookup-mods
-        #:device-state-compat-lookup-mods
-        #:device-state-ptr-btn-state)
+(export '(+use-core-kbd+
+          +use-core-ptr+
+          xkeyboard-error
+          make-device-state
+          device-state-p
+          copy-device-state
+          device-state-device-id
+          device-state-mods
+          device-state-base-mods
+          device-state-latched-mods
+          device-state-locked-mods
+          device-state-group
+          device-state-locked-group
+          device-state-base-group
+          device-state-latched-group
+          device-state-compat-state
+          device-state-grab-mods
+          device-state-compat-grab-mods
+          device-state-lookup-mods
+          device-state-compat-lookup-mods
+          device-state-ptr-btn-state
+          get-state
+          latch-lock-state
+          lock-group
+          ))
 
 (define-condition xkeyboard-error (request-error) ())
 
@@ -475,7 +478,7 @@
     (keyword name)
     (window window)))
 
-(defstruct device-state
+(defstruct device-state 
   (device-id 0 :type card8)
   (mods 0 :type keymask)
   (base-mods 0 :type keymask)
@@ -512,8 +515,6 @@
      :lookup-mods (keymask-get 19)
      :compat-lookup-mods (keymask-get 20)
      :ptr-btn-state (butmask-get 22))))
-
-(export 'get-state)
 
 (defun latch-lock-state (display &key (device +use-core-kbd+)
                                    affect-mod-locks

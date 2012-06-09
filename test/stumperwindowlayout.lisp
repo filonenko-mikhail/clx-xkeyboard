@@ -1,12 +1,13 @@
 ;;;; Save keyboard layout per window for stumpwm. 
 
 (asdf:compute-source-registry)
-(require :xkeyboard)
+
+(asdf:load-system :xkeyboard)
 
 (in-package :stumpwm)
 
-(defun get-current-layout (display &optional (device +use-core-kbd+))
-  (xlib:device-state-locked-group (xlib:get-state display device)))
+(defun get-current-layout (display)
+  (xlib:device-state-locked-group (xlib:get-state display)))
 
 (defun window-focus-changed (window previous-window)
   (let ((current-layout (get-current-layout *display*)))
@@ -21,12 +22,12 @@
   (let ((previous-window (stumpwm::group-current-window previous-group))
         (window (stumpwm::group-current-window group)))
     (format t "prev w ~a next w ~a~%" previous-window window)
-    (focus-changed window previous-window)))
+    (window-focus-changed window previous-window)))
 
 
 (defcommand enable-per-window-layout () ()
-  (xlib:enable-xkeyboard *display*) ;; we need it because
-  (xlib::initialize-extensions *display*) ;; stumpwm opens display before extension definition
+  (xlib::initialize-extensions *display*) ;; we need it because
+  (xlib:enable-xkeyboard *display*) ;; stumpwm opens display before extension definition  
   (add-hook *focus-group-hook* 'group-focus-changed)
   (add-hook *focus-window-hook* 'window-focus-changed))
 
