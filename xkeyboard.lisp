@@ -197,6 +197,7 @@
 (defconstant +AXN_BKReject+ #x20)
 (defconstant +AXN_AXKWarning+ #x40)
 
+;SETofKB_MAPPART
 (defconstant +KeyTypes+ #x0001)
 (defconstant +KeySyms+ #x0002)
 (defconstant +ModifierMap+ #x0004)
@@ -205,6 +206,17 @@
 (defconstant +KeyBehaviors+ #x0020)
 (defconstant +VirtualMods+ #x0040)
 (defconstant +VirtualModMap+ #x0080)
+
+;SETofKEYMASK clx never explicitly defines them
+(defconstant +shift+ #x0001)
+(defconstant +lock+ #x0002)
+(defconstant +control+ #x0004)
+(defconstant +mod1+ #x0008)
+(defconstant +mod2+ #x0010)
+(defconstant +mod3+ #x0020)
+(defconstant +mod4+ #x0040)
+(defconstant +mod5+ #x0080)
+
 (defconstant +ModifierState+ #x0001)
 (defconstant +ModifierBase+ #x0002)
 (defconstant +ModifierLatch+ #x0004)
@@ -549,6 +561,477 @@
                             :mod-latches 0
                             :latch-group nil
                             :group-latch 0))
+
+(defstruct modmap
+  (keycode 0 :type keycode)
+  (mods 0 :type keymask))
+
+ (defstruct vmodmap
+  (keycode 0 :type keycode)
+  (vmods 0 :type vmodmask))
+
+(defstruct behaviormap ;defstruct introduces a new type, so we have to
+                       ;distinguish it from the existing behavior.
+  (keycode 0 :type keycode)
+  (behavior 0 :type behavior))
+
+(defstruct explicitmap ;same as behavior/behaviormap
+  (keycode 0 :type keycode)
+  (explicit 0 :type explicit))
+
+(defstruct keytype-mapentry
+  (active nil :type (member nil t))
+  (mask 0 :type keymask)
+  (level 0 :type card8)
+  (mods 0 :type keymask)
+  (vmods 0 :type vmodmask))
+
+(defstruct keytype
+  (mask 0 :type keymask)
+  (mods 0 :type keymask)
+  (vmods 0 :type vmodmask)
+  (levels 0 :type card8)
+  (map-entries 0 :type card8)
+  (preserve-p nil :type (member nil t))
+  (map nil :type list)
+  (preserve nil :type list))
+
+(defstruct keysymmap
+  (kt-index (make-array 4 :element-type 'card8
+                          :initial-element 0)
+   :type (vector card8 4))
+  (group 0 :type card8)
+  (width 0 :type card8)
+  (n 0 :type card16)
+  (keysyms nil :type list))
+
+(defstruct virtual-modifier-bindings
+  (virtual-modifiers 0 :type vmodmask)
+  (real-modifiers-per-virtual-modifier nil :type list))
+
+(defstruct xkb-keymap-part
+  (first 0 :type (or card8 keycode)) ;doesn't matter as card8 = keycode, but logically
+  (n 0 :type card8)
+  (total 0 :type card16)
+  (list nil :type list))
+
+(defstruct xkb-keymap
+  (min-keycode 0 :type keycode)
+  (max-keycode 0 :type keycode)
+  (mappart-mask 0 :type mappart)
+  (types nil :type (or null xkb-keymap-part))
+  (syms nil :type (or null xkb-keymap-part))
+  (actions nil :type (or null xkb-keymap-part))
+  (behaviors nil :type (or null xkb-keymap-part))
+  (explicits nil :type (or null xkb-keymap-part))
+  (modmapkeys nil :type (or null xkb-keymap-part))
+  (vmodmapkeys nil :type (or null xkb-keymap-part))
+  (virtualmods nil :type (or null virtual-modifier-bindings)))
+
+(defun contained-in-mask (const mask)
+  (plusp (logand const mask)))
+
+(defmacro moddef-get (indexsym)
+  `(prog1 (make-moddef
+           :mask (keymask-get ,indexsym)
+           :real-mods (keymask-get (index-incf ,indexsym 1))
+           :vmods (vmodmask-get (index-incf ,indexsym 1)))
+     (index-incf ,indexsym 2)))
+
+(defmacro modmap-get (indexsym)
+  `(prog1 (make-modmap
+           :keycode (keycode-get ,indexsym)
+           :mods (keymask-get (index-incf ,indexsym 1)))
+     (index-incf ,indexsym 1)))
+
+(defmacro vmodmap-get (indexsym)
+  `(prog1 (make-vmodmap
+           :keycode (keycode-get ,indexsym)
+           :vmods   (vmodmask-get (index-incf ,indexsym 2)))
+     (index-incf ,indexsym 2)))
+
+(defmacro behaviormap-get (indexsym)
+  `(prog1 (make-behaviormap
+           :keycode (keycode-get ,indexsym)
+           :behavior (behavior-get (index-incf ,indexsym 1)))
+     (index-incf ,indexsym 3)))
+
+(defmacro explicitmap-get (indexsym)
+  `(prog1 (make-explicitmap
+           :keycode (keycode-get ,indexsym)
+           :explicit (explicit-get (index-incf ,indexsym 1)))
+     (index-incf ,indexsym 1)))
+
+(defmacro keytype-mapentry-get (indexsym)
+  `(prog1 (make-keytype-mapentry
+           :active (boolean-get ,indexsym)
+           :mask (keymask-get (index-incf ,indexsym 1))
+           :level (card8-get (index-incf ,indexsym 1))
+           :mods (keymask-get (index-incf ,indexsym 1))
+           :vmods (vmodmask-get (index-incf ,indexsym 1)))
+     (index-incf ,indexsym 4)))
+
+(defmacro keytype-get (indexsym)
+  (let ((n-map-entries-sym (gensym "n-map-entries"))
+        (preserve-p-sym (gensym "preserve-p")))
+    `(let (,n-map-entries-sym ,preserve-p-sym)
+       (make-keytype
+        :mask (keymask-get ,indexsym)
+        :mods (keymask-get (index-incf ,indexsym 1))
+        :vmods (vmodmask-get (index-incf ,indexsym 1))
+        :levels (card8-get (index-incf ,indexsym 2))
+        :map-entries (setf ,n-map-entries-sym (card8-get (index-incf ,indexsym 1)))
+        :preserve-p (setf ,preserve-p-sym (boolean-get (index-incf ,indexsym 1)))
+        :map (progn (index-incf ,indexsym 2)
+                    (loop repeat ,n-map-entries-sym
+                          collect (keytype-mapentry-get ,indexsym)))
+        :preserve (when ,preserve-p-sym
+                    (loop repeat ,n-map-entries-sym
+                          collect (moddef-get ,indexsym)))))))
+
+(defmacro keysymmap-get (indexsym)
+  (let ((n-sym (gensym)))
+    `(let (,n-sym)
+       (make-keysymmap
+        :kt-index (coerce (loop repeat 4
+                               collect (prog1 (card8-get ,indexsym)
+                                         (index-incf ,indexsym 1)))
+                          '(vector card8 4))
+        :group (prog1 (card8-get ,indexsym)
+                 (index-incf ,indexsym 1))
+        :width (prog1 (card8-get ,indexsym)
+                 (index-incf ,indexsym 1))
+        :n (prog1 (setf ,n-sym (card16-get ,indexsym)) ;depending on
+                                                       ;side effects
+                                                       ;in this way
+                                                       ;makes me
+                                                       ;feeling dirty
+             (index-incf ,indexsym 2))
+        :keysyms (loop repeat ,n-sym
+                       collect (prog1 (card32-get ,indexsym)
+                                 (index-incf ,indexsym 4)))))))
+
+(defmacro xkb-keymap-get (indexsym)
+  (let ((minKeycodeSym (gensym))
+        (maxKeycodeSym (gensym))
+        (mappartMaskSym (gensym))
+        (firstTypeSym (gensym))
+        (nTypesSym (gensym))
+        (totalTypesSym (gensym))
+        (firstKeysymSym (gensym))
+        (totalSymsSym (gensym))
+        (nKeysymsSym (gensym))
+        (firstKeyactionSym (gensym))
+        (totalActionsSym (gensym))
+        (nKeyactionsSym (gensym))
+        (firstKeybehaviorSym (gensym))
+        (nKeybehaviorSym (gensym))
+        (totalKeybehaviorsSym (gensym))
+        (firstKeyexplicitSym (gensym))
+        (nKeyexplicitSym (gensym))
+        (totalKeyexplicitSym (gensym))
+        (firstModMapKeySym (gensym))
+        (nModMapKeySym (gensym))
+        (totalModMapKeySym (gensym))
+        (firstVModMapKeySym (gensym))
+        (nVModMapKeySym (gensym))
+        (totalVModMapKeySym (gensym))
+        (virtualModsSym (gensym)))
+    `(let ((,minKeycodeSym (card8-get ,indexsym))
+           (,maxKeycodeSym (card8-get (index-incf ,indexsym 1)))
+           (,mappartMaskSym (card16-get (index-incf ,indexsym 1)))
+           (,firstTypeSym (card8-get (index-incf ,indexsym 2)))
+           (,nTypesSym (card8-get (index-incf ,indexsym 1)))
+           (,totalTypesSym (card8-get (index-incf ,indexsym 1)))
+           (,firstKeysymSym (card8-get (index-incf ,indexsym 1)))
+           (,totalSymsSym (card16-get (index-incf ,indexsym 1)))
+           (,nKeysymsSym (card8-get (index-incf ,indexsym 2)))
+           (,firstKeyactionSym (card8-get (index-incf ,indexsym 1)))
+           (,totalActionsSym (card16-get (index-incf ,indexsym 1)))
+           (,nKeyactionsSym (card8-get (index-incf ,indexsym 2)))
+           (,firstKeybehaviorSym (card8-get (index-incf ,indexsym 1)))
+           (,nKeybehaviorSym (card8-get (index-incf ,indexsym 1)))
+           (,totalKeybehaviorsSym (card8-get (index-incf ,indexsym 1)))
+           (,firstKeyexplicitSym (card8-get (index-incf ,indexsym 1)))
+           (,nKeyexplicitSym (card8-get (index-incf ,indexsym 1)))
+           (,totalKeyexplicitSym (card8-get (index-incf ,indexsym 1)))
+           (,firstModMapKeySym (card8-get (index-incf ,indexsym 1)))
+           (,nModMapKeySym (card8-get (index-incf ,indexsym 1)))
+           (,totalModMapKeySym (card8-get (index-incf ,indexsym 1)))
+           (,firstVModMapKeySym (card8-get (index-incf ,indexsym 1)))
+           (,nVModMapKeySym (card8-get (index-incf ,indexsym 1)))
+           (,totalVModMapKeySym (card8-get (index-incf ,indexsym 1)))
+           (,virtualModsSym (card16-get (index-incf ,indexsym 2))))
+       (declare (ignore ,nVModMapKeySym))
+       (index-incf ,indexsym 2)
+       (make-xkb-keymap
+        :min-keycode ,minKeycodeSym
+        :max-keycode ,maxKeycodeSym
+        :mappart-mask ,mappartMaskSym
+        :types (when (contained-in-mask +KEYTYPES+ ,mappartMaskSym)
+                 (make-xkb-keymap-part
+                  :first ,firstTypeSym
+                  :n ,nTypesSym
+                  :total ,totalTypesSym
+                  :list (loop repeat ,nTypesSym
+                              collect (keytype-get ,indexsym))))
+        :syms (when (contained-in-mask +KEYSYMS+ ,mappartMaskSym)
+                (make-xkb-keymap-part
+                 :first ,firstKeysymSym
+                 :n ,nKeysymsSym
+                 :total ,totalSymsSym
+                 :list (loop repeat ,nKeysymsSym
+                             collect (keysymmap-get ,indexsym))))
+        :actions (when (contained-in-mask +KEYACTIONS+ ,mappartMaskSym)
+                   (make-xkb-keymap-part
+                    :first ,firstKeyactionSym
+                    :n ,nKeyactionsSym
+                    :total ,totalActionsSym
+                    :list (cons
+                           (loop repeat ,nKeyactionsSym
+                                 collect (prog1 (card8-get ,indexsym)
+                                           (index-incf ,indexsym 1))
+                                 finally (setf ,indexsym (lround ,indexsym)))
+                           (loop repeat ,totalActionsSym
+                                 collect (loop repeat 8
+                                               collect (prog1 (card8-get ,indexsym)
+                                                         (index-incf ,indexsym 1)))))))
+        :behaviors (when (contained-in-mask +KEYBEHAVIORS+ ,mappartMaskSym)
+                     (make-xkb-keymap-part
+                      :first ,firstKeybehaviorSym
+                      :n ,nKeybehaviorSym
+                      :total ,totalKeybehaviorsSym
+                      :list (loop repeat ,totalKeybehaviorsSym
+                                  collect (behaviormap-get ,indexsym))))
+        :virtualmods (when (contained-in-mask +VIRTUALMODS+ ,mappartMaskSym)
+                       (make-virtual-modifier-bindings
+                        :virtual-modifiers ,virtualModsSym
+                        :real-modifiers-per-virtual-modifier
+               (loop for i from 0 upto 15 when (= (ldb (byte 1 i) ,virtualModsSym) 1)
+                     collect (prog1 (keymask-get ,indexsym)
+                               (index-incf ,indexsym 1)))))
+        :explicits (when (contained-in-mask +EXPLICITCOMPONENTS+ ,mappartMaskSYm)
+                     (prog1 (make-xkb-keymap-part
+                             :first ,firstKeyexplicitSym
+                             :n ,nKeyexplicitSym
+                             :total ,totalKeyexplicitSym
+                             :list (loop repeat ,totalKeyexplicitSym
+                                         collect (explicitmap-get ,indexsym)))
+                       (setf ,indexsym (lround ,indexsym))))
+        :modmapkeys (when (contained-in-mask +MODIFIERMAP+ ,mappartMaskSym)
+                      (prog1 (make-xkb-keymap-part
+                              :first ,firstModMapKeySym
+                              :n ,nModMapKeySym
+                              :total ,totalModMapKeySym
+                              :list (loop repeat ,totalModMapKeySym
+                                          collect (modmap-get ,indexsym)))
+                        (setf ,indexsym (lround ,indexsym))))
+        :vmodmapkeys (when (contained-in-mask +VIRTUALMODMAP+ ,mappartMaskSym)
+                       (make-xkb-keymap-part
+                        :first ,firstVModMapKeySym
+                        :n 0
+                        :total ,totalVModMapKeySym
+                        :list (loop repeat ,totalVModMapKeySym
+                                    collect (vmodmap-get ,indexsym))))))))
+
+(defun get-map (display devicespec mappart-mask-full)
+  (with-buffer-request-and-reply (display (xkeyboard-opcode display) nil)
+      ((data +get-map+)
+       (devicespec devicespec)
+       (mappart mappart-mask-full) ;full
+       (mappart 0) ;partial
+       (card8 0)  ;firstType
+       (card8 0)  ;nTypes
+       (keycode 0)  ;firstKeySym
+       (card8 0)  ;nKeySyms
+       (keycode 0)  ;firstKeyAction
+       (card8 0)  ;nKeyActions
+       (keycode 0)  ;firstKeyBehavior
+       (card8 0)  ;nKeyBehavior
+       (vmodmask 0) ;virtualMods
+       (keycode 0)  ;firstKeyExplicit
+       (card8 0)  ;nKeyExplicit
+       (keycode 0)  ;firstModMapKey
+       (card8 0)  ;nModMapKeys
+       (keycode 0)  ;firstVModMapKey
+       (card8 0)  ;nVModMapKeys
+       (pad16 nil))
+    (let ((index 10))
+      (xkb-keymap-get index))))
+
+(defstruct client-keytype-mapentry
+  (preserve 0 :type keymask)
+  (active nil :type (member nil t))
+  (level 0 :type card8))
+
+(defstruct client-keytype
+  (mask 0 :type keymask)
+  (map (make-hash-table) :type hash-table))
+
+(defstruct client-keysymmap
+  (num-groups 0 :type card8)
+  (groups-wrap nil :type symbol)
+  (redirect-group 0 :type card8)
+  (keysyms (make-array 0) :type vector)
+  (width 0 :type card8)
+  (keytypes (make-array 0) :type vector))
+
+(defstruct client-mapping
+  (symmaps (make-array 0) :type vector))
+
+
+(defun construct-keytype-map-entry (entry preserve)
+  (make-client-keytype-mapentry
+   :preserve preserve
+   :active (keytype-mapentry-active entry)
+   :level (keytype-mapentry-level entry)))
+
+(defun construct-type (type)
+  (let ((result (make-client-keytype
+                 :mask (keytype-mask type))))
+    (loop for i from 0 below (keytype-map-entries type)
+          for mapentry in (keytype-map type)
+          for preserve = (if (keytype-preserve-p type)
+                             (moddef-mask (nth i (keytype-preserve type))) 0)
+          do (push (construct-keytype-map-entry mapentry preserve)
+                   (gethash (keytype-mapentry-mask mapentry)
+                            (client-keytype-map result))))
+    result))
+
+(defun construct-type-vector (typevector types)
+  (loop for i from 0
+        repeat (xkb-keymap-part-n types)
+        do (setf (svref typevector (+ i (xkb-keymap-part-first types)))
+                 (construct-type (nth i (xkb-keymap-part-list types))))))
+
+(defun symbolize-groups-wrap (groups-wrap-number)
+  (or (case groups-wrap-number
+        (0 :wrap)
+        (2 :clamp)
+        (4 :redirect))
+      (error "wrong-value-in-groups-wrap")))
+
+(defun construct-symmap (symmap typevector)
+  (let ((groupinfo (keysymmap-group symmap)))
+    (make-client-keysymmap
+     :num-groups (ldb (byte 4 0) groupinfo)
+     :groups-wrap (symbolize-groups-wrap (ldb (byte 2 6) groupinfo))
+     :redirect-group (ldb (byte 2 4) groupinfo)
+     :keysyms (coerce (keysymmap-keysyms symmap) 'vector)
+     :width (keysymmap-width symmap)
+     :keytypes (coerce (loop for i from 0 below 4
+                             collect (svref
+                                      typevector
+                                        ;svref better? but sbcl complains about types.
+                                      (aref (keysymmap-kt-index symmap) i)))
+                'vector))))
+
+(defun transform-xkb-keymap-to-client-mapping (info)
+  (let*
+      ((types (xkb-keymap-types info))
+       (symmaps (xkb-keymap-syms info))
+       (symmaps-array (make-array (+ (xkb-keymap-part-first symmaps)
+                                     (xkb-keymap-part-n symmaps))))
+       (typevector (make-array (+ (xkb-keymap-part-first types)
+                                  (xkb-keymap-part-n types)))))
+    (construct-type-vector typevector types)
+    (loop for i from 0
+                repeat (xkb-keymap-part-n symmaps)
+          do (setf (svref symmaps-array (+ (xkb-keymap-part-first symmaps) i))
+                   (construct-symmap (nth i (xkb-keymap-part-list symmaps))
+                                     typevector)))
+    (make-client-mapping
+     :symmaps symmaps-array)))
+
+(defun corestate->group (corestate)
+  (ldb (byte 2 13) corestate))
+
+(defun corestate->mask (corestate)
+  (ldb (byte 8 0) corestate))
+
+(defun sanitize-redirect-group (num-groups redirect-group)
+  (if (>= redirect-group num-groups)
+      0 redirect-group))
+
+(defun effective-group (event-group num-groups groups-wrap redirect-group)
+  (cond
+    ((= num-groups 0) 0)
+    ((<= 0 event-group (1- num-groups)) event-group)
+    (t
+     (case groups-wrap
+       (:wrap (mod event-group num-groups))
+       (:clamp (1- num-groups))
+       (:redirect (sanitize-redirect-group num-groups redirect-group))))))
+
+(defun calculate-leftover-modifiers (mask entry keytype-mask)
+  (logior (client-keytype-mapentry-preserve entry)
+          (logand mask (lognot keytype-mask))))
+
+(defun shiftlevel/leftover-modifiers (keytype mask)
+  (let ((keytype-mask (client-keytype-mask keytype)))
+    (loop for entry in (gethash (logand mask keytype-mask)
+                                (client-keytype-map keytype))
+          when (client-keytype-mapentry-active entry)
+            return (values (client-keytype-mapentry-level entry)
+                           (calculate-leftover-modifiers mask entry keytype-mask))
+          finally (return (values 0 (logand mask (lognot keytype-mask)))))))
+
+(defun keyevent->keysym (mapping keycode corestate)
+  (let* ((group (corestate->group corestate))
+         (mask (corestate->mask corestate))
+         (symmap (svref (client-mapping-symmaps mapping) keycode))
+         (effective-group (effective-group group
+                                           (client-keysymmap-num-groups symmap)
+                                           (client-keysymmap-groups-wrap symmap)
+                                           (client-keysymmap-redirect-group symmap)))
+         (keytype (svref (client-keysymmap-keytypes symmap)
+                         effective-group)))
+    (if (= (length (client-keysymmap-keysyms symmap)) 0)
+        nil
+        (multiple-value-bind (shiftlevel leftover-modifiers)
+            (shiftlevel/leftover-modifiers keytype mask)
+          (values
+           (svref (client-keysymmap-keysyms symmap)
+                  (+ (* effective-group (client-keysymmap-width symmap)) shiftlevel))
+           leftover-modifiers)))))
+
+(defun xkb/keysym->character (keysym keysymdb) ;keysymdb would be normally +xkbkeysymdb+
+  (cond
+    ((or (<= #x0020 keysym #x007E) (<= #x00A0 keysym #x00FF))
+        (code-char keysym))
+    ((<= #x01000100 keysym #x0110FFFF)
+        (code-char (- keysym #x01000000)))
+    (t
+        (let ((codepoint (cadr (assoc :unicode (gethash keysym keysymdb)))))
+          (if codepoint (code-char codepoint))))))
+
+(defun upcase-keysym (keysym)
+  ;;this is wrong, but ...
+  ;;we only upcase a-z for the time being, if someone wants
+  ;;better upcasing support, she or he should do it herself, himself
+  ;;the f*** *p xkb specification talks about keysyms with symbolic names
+  ;;in Appendix A, which (the symbolic names) never get defined in it
+  ;;or in the core X protocol specification.
+  (cond
+    ((<= #x0061 keysym #x007A) (- keysym #x0020))
+    (t keysym)))
+
+(defun control-character (keysym keysymdb)
+  (cond
+    ((<= #x0041 keysym #x005F) (code-char (- keysym #x0041))) ;A-Z[\]^_
+    ((<= #x0061 keysym #x007A) (code-char (- keysym #x0061))) ;a-z
+    (t (xkb/keysym->character keysym keysymdb))))
+
+(defun process-leftover-modifiers (keysym leftover-modifiers keysymdb)
+  (cond
+    ((contained-in-mask +control+ leftover-modifiers)
+     (values keysym (string (control-character keysym keysymdb))))
+    ((contained-in-mask +lock+ leftover-modifiers)
+     (values (upcase-keysym keysym)
+             (string (xkb/keysym->character (upcase-keysym keysym) keysymdb))))
+    (t
+     (values keysym
+             (string (xkb/keysym->character keysym keysymdb))))))
 
 ;;; Local Variables:
 ;;; indent-tabs-mode: nil

@@ -6,5 +6,6 @@
   :author "Michael Filonenko"
   :license "MIT"
   :depends-on (:clx)
-  :components ((:file "xkeyboard")))
+  :components ((:file "keysymdef")
+               (:file "xkeyboard" :depends-on ("keysymdef"))))
 
