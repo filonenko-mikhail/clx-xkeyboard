@@ -19,5 +19,5 @@ For storing keyboard layout in Stumpwm window manager add to your =~/.stumpwmrc=
 License: MIT
 
 Written by
-  Michael Filonenko <filonenko.mikhail@gmail.com>
-  Eric Wolf
+  Michael Filonenko <filonenko.mikhail at gmail.com>
+  Eric Wolf <eric at boese-wolf.eu>

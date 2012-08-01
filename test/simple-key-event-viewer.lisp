@@ -3,9 +3,12 @@
 ;;;; Button2 (usually middle mouse butten) closes window and ends
 ;;;; application.
 
-(asdf:compute-source-registry)
 
-(asdf:load-system :xkeyboard)
+(defpackage xkb-test
+  (:use cl)
+  (:export simple-key-event-viewer))
+
+(in-package :xkb-test)
 
 (defun print-key-list (&rest args)
   (fresh-line)
@@ -76,7 +79,7 @@
                                      grackon
                                      20
                                      50
-                                     "Hello World!"))
+                                     "Hello World! Press middle mouse button to exit."))
                  nil)
       (:key-press (code sequence time root event-window
                         child root-x root-y x y state same-screen-p)

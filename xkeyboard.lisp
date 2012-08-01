@@ -10,6 +10,9 @@
 
 (export '(+use-core-kbd+
           +use-core-ptr+
+
+          +xkbkeysymdb+
+
           xkeyboard-error
           make-device-state
           device-state-p
@@ -29,9 +32,27 @@
           device-state-lookup-mods
           device-state-compat-lookup-mods
           device-state-ptr-btn-state
+
           get-state
           latch-lock-state
           lock-group
+
+          get-map
+          transform-xkb-keymap-to-client-mapping
+          keyevent->keysym
+          xkb/keysym->character
+
+          client-mapping
+          process-leftover-modifiers
+          client-mapping-symmaps
+          effective-group
+          corestate->group
+          client-keysymmap-num-groups
+          client-keysymmap-groups-wrap
+          client-keysymmap-redirect-group
+          client-keysymmap-keytypes
+          shiftlevel/leftover-modifiers
+          corestate->mask
           ))
 
 (define-condition xkeyboard-error (request-error) ())
