@@ -1,5 +1,6 @@
-http://www.x.org/docs/XKB/XKBproto.pdf for common lisp clx library.
+XKeyboard is extension for common lisp clx library.
 Implementation of small part of XKeyboard extension as described by
+http://www.x.org/docs/XKB/XKBproto.pdf
 
 ** Installation
 
@@ -15,4 +16,8 @@ For storing keyboard layout in Stumpwm window manager add to your =~/.stumpwmrc=
 (run-commands "enable-per-window-layout")
 #+END_SRC
 
-Written by Michael Filonenko <filonenko.mikhail@gmail.com>
+License: MIT
+
+Written by
+  Michael Filonenko <filonenko.mikhail@gmail.com>
+  Eric Wolf
