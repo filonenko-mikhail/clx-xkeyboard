@@ -1039,8 +1039,8 @@
 
 (defun control-character (keysym keysymdb)
   (cond
-    ((<= #x0041 keysym #x005F) (code-char (- keysym #x0041))) ;A-Z[\]^_
-    ((<= #x0061 keysym #x007A) (code-char (- keysym #x0061))) ;a-z
+    ((<= #x0040 keysym #x005F) (code-char (- keysym #x0040))) ;@A-Z[\]^_
+    ((<= #x0061 keysym #x007A) (code-char (- keysym #x0060))) ;a-z
     (t (xkb/keysym->character keysym keysymdb))))
 
 (defun process-leftover-modifiers (keysym leftover-modifiers keysymdb)
