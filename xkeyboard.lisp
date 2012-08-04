@@ -6,7 +6,17 @@
 
 (define-extension "XKEYBOARD"
   :events (:new-keyboard-notify
-           :xkb-map-notify)
+           :xkb/map-notify
+           :state-notify
+           :controls-notify
+           :indicator-state-notify
+           :indicator-map-notify
+           :names-notify
+           :compat-map-notify
+           :bell-notify
+           :action-message
+           :access-x-notify
+           :extension-device-notify)
   :errors (xkeyboard-error))
 
 (export '(+use-core-kbd+
@@ -106,7 +116,8 @@
   (define-card16-abrev statepart)
   (define-card32-abrev control)
   (define-card8-abrev cmdetail)
-  (define-card16-abrev xidetail) 
+  (define-card16-abrev xidetail)
+  (define-card16-abrev xifeature)
 
   (define-card8-abrev group)
 
@@ -118,7 +129,8 @@
   (define-card16-abrev axoption)
   (define-card32-abrev boolctrl)
   (define-card16-abrev mappart)
-  (define-card16-abrev setmapflags) 
+  (define-card16-abrev setmapflags)
+  (define-card16-abrev ledclassresult)
   (define-card16-abrev ledclassspec)
   (define-card16-abrev axndetail)
   (define-card32-abrev namedetail)
@@ -151,6 +163,7 @@
 (deftype control () 'card32)
 (deftype cmdetail () 'card8)
 (deftype xidetail () 'card16)
+(deftype xifeature () 'card16)
 (deftype group () 'card8)
 (deftype groups () 'card8)
 (deftype immodswhich () 'card8)
@@ -161,6 +174,7 @@
 (deftype boolctrl () 'card32)
 (deftype mappart () 'card16)
 (deftype setmapflags () 'card16)
+(deftype ledclassresult () 'card16)
 (deftype ledclassspec () 'card16)
 (deftype axndetail () 'card16)
 (deftype namedetail () 'card32)
@@ -1055,9 +1069,9 @@
      (values keysym
              (string (xkb/keysym->character keysym keysymdb))))))
 
-(declare-event (:new-keyboard-notify)
+(declare-event :new-keyboard-notify
   (card16 sequence)
-  ((or null card32) timestamp)
+  ((or null card32) time)
   (card8 device-id)
   (card8 old-device-id)
   (keycode min-key-code)
@@ -1068,10 +1082,10 @@
   (card8 request-minor)
   (nkndetail changed))
 
-(declare-event (:xkb-map-notify) ; additional xkb is necessary, as
-                                 ; :map-notify is already used by xkb
+(declare-event :xkb/map-notify    ; additional xkb is necessary, as
+                                        ; :map-notify is already used by xkb
   (card16 sequence)
-  ((or null card32) timestamp)
+  ((or null card32) time)
   (card8 device-id)
   (butmask ptr-btn-actions)
   (mappart changed)
@@ -1092,6 +1106,147 @@
   (keycode first-vmod-map-key)
   (card8 n-vmod-map-keys)
   (vmodmask virtual-mods))
+
+(declare-event :state-notify
+  (card16 sequence)
+  ((or null card32) time)
+  (card8 device-id)
+  (keymask mods)
+  (keymask base-mods)
+  (keymask latched-mods)
+  (keymask locked-mods)
+  (group group)
+  (int16 base-group)
+  (int16 latched-group)
+  (group locked-group)
+  (keymask compat-state)
+  (keymask grab-mods)
+  (keymask compat-grab-mods)
+  (keymask lookup-mods)
+  (keymask compat-lookup-mods)
+  (butmask ptr-btn-state)
+  (statepart changed)
+  (keycode keycode)
+  (card8 event-type)
+  (card8 request-major)
+  (card8 request-minor))
+
+(declare-event :controls-notify
+  (card16 sequence)
+  ((or null card32) time)
+  (card8 device-id)
+  (card8 num-groups)
+  (pad16 0)
+  (control changed-control)
+  (boolctrl enabled-controls)
+  (boolctrl enabled-control-changes)
+  (keycode keycode)
+  (card8 event-type)
+  (card8 request-major)
+  (card8 request-minor))
+
+(declare-event :indicator-state-notify
+  (card16 sequence)
+  ((or null card32) time)
+  (card8 device-id)
+  (pad8 0)
+  (pad16 0)
+  (indicator state)
+  (indicator state-changed))
+
+(declare-event :indicator-map-notify
+  (card16 sequence)
+  ((or null card32) time)
+  (card8 device-id)
+  (pad8 0)
+  (pad16 0)
+  (indicator state)
+  (indicator map-changed))
+
+(declare-event :names-notify
+  (card16 sequence)
+  ((or null card32)  timp)
+  (card8 device-id)
+  (pad8 0)
+  (namedetail changed)
+  (card8 first-type)
+  (card8 n-types)
+  (card8 fist-level-name)
+  (card8 n-level-names)
+  (pad8 0)
+  (card8 n-radio-groups)
+  (card8 n-key-aliases)
+  (group changed-group-names)
+  (vmod changed-virtual-mods)
+  (keycode fist-key)
+  (card8 n-keys)
+  (indicator changed-indicators))
+
+(declare-event :compat-map-notify
+  (card16 sequence)
+  ((or null card32) time)
+  (card8 device-id)
+  (group changed-groups)
+  (card16 first-si)
+  (card16 n-si)
+  (card16 n-total-si))
+
+(declare-event :bell-notify
+  (card16 sequence)
+  ((or null card32) time)
+  (card8 device-id)
+  (bellclassresult bell-class)
+  (card8 bell-id)
+  (card8 percent)
+  (card16 pitch)
+  (card16 duration)
+  (keyword name)
+  (window window)
+  (boolean event-only))
+
+(declare-event :action-message
+  (card16 sequence)
+  ((or null card32) time)
+  (card8 device-id)
+  (keycode keycode)
+  (boolean press)
+  (boolean key-event-follows)
+  (keymask mods)
+  (group group)
+  ;;this is braindead, but (sequence :format card8 :index 14 :length 8)
+  ;;and (string 8) don't work in declare-event ...
+  (card8 message-byte1)
+  (card8 message-byte2)
+  (card8 message-byte3)
+  (card8 message-byte4)
+  (card8 message-byte5)
+  (card8 message-byte6)
+  (card8 message-byte7)
+  (card8 message-byte8))
+
+(declare-event :access-x-notify
+  (card16 sequence)
+  ((or null card32) time)
+  (card8 device-id)
+  (keycode keycode)
+  (axndetail detail)
+  (card16 slow-keys-delay)
+  (card16 debounce-delay))
+
+(declare-event :extension-device-notify
+  (card16 sequence)
+  ((or null card32) time)
+  (card8 device-id)
+  (pad8 0)
+  (xidetail reason)
+  (ledclassresult led-class)
+  (card8 led-id)
+  (indicator leds-defined)
+  (indicator led-state)
+  (card8 first-button)
+  (card8 n-buttons)
+  (xifeature supported)
+  (xifeature unsupported))
 
 ;;; Local Variables:
 ;;; indent-tabs-mode: nil
