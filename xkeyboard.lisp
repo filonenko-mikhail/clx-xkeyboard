@@ -5,7 +5,8 @@
 (pushnew :clx-ext-xkeyboard *features*)
 
 (define-extension "XKEYBOARD"
-  :events () 
+  :events (:new-keyboard-notify
+           :xkb-map-notify)
   :errors (xkeyboard-error))
 
 (export '(+use-core-kbd+
@@ -1053,6 +1054,44 @@
     (t
      (values keysym
              (string (xkb/keysym->character keysym keysymdb))))))
+
+(declare-event (:new-keyboard-notify)
+  (card16 sequence)
+  ((or null card32) timestamp)
+  (card8 device-id)
+  (card8 old-device-id)
+  (keycode min-key-code)
+  (keycode max-key-code)
+  (keycode old-min-key-code)
+  (keycode old-max-key-code)
+  (card8 request-major)
+  (card8 request-minor)
+  (nkndetail changed))
+
+(declare-event (:xkb-map-notify) ; additional xkb is necessary, as
+                                 ; :map-notify is already used by xkb
+  (card16 sequence)
+  ((or null card32) timestamp)
+  (card8 device-id)
+  (butmask ptr-btn-actions)
+  (mappart changed)
+  (keycode min-key-code)
+  (keycode max-key-code)
+  (card8 first-type)
+  (card8 n-types)
+  (keycode first-key-sym)
+  (card8 n-key-syms)
+  (keycode first-key-action)
+  (card8 n-key-actions)
+  (keycode first-key-behavior)
+  (card8 n-key-behaviors)
+  (keycode first-key-explicit)
+  (card8 n-key-explicits)
+  (keycode first-mod-map-key)
+  (card8 n-mod-map-keys)
+  (keycode first-vmod-map-key)
+  (card8 n-vmod-map-keys)
+  (vmodmask virtual-mods))
 
 ;;; Local Variables:
 ;;; indent-tabs-mode: nil
