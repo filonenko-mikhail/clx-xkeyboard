@@ -110,15 +110,14 @@
                                       min-key-code max-key-code
                                       old-min-key-code old-max-key-code
                                       request-major request-minor changed)
-                            (when (not (eql changed 0))
-                              (format t "NEW KEYBOARD NOTIFY~%")
-                              (print-key-list-dupled sequence time
-                                                     device-id old-device-id
-                                                     min-key-code max-key-code
-                                                     old-min-key-code old-max-key-code
-                                                     request-major request-minor
-                                                     changed)
-                              (format t "END NEW KEYBOARD NOTIFY~%~%"))
+                            (format t "NEW KEYBOARD NOTIFY~%")
+                            (print-key-list-dupled sequence time
+                                                   device-id old-device-id
+                                                   min-key-code max-key-code
+                                                   old-min-key-code old-max-key-code
+                                                   request-major request-minor
+                                                   changed)
+                            (format t "END NEW KEYBOARD NOTIFY~%~%")
                             nil)
       (:xkb/map-notify (sequence time device-id
                         ptr-btn-actions changed
