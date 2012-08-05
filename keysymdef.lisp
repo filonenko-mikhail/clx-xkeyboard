@@ -1,5 +1,4 @@
-
-(in-package :clx-widget)
+(in-package :xlib)
 
 (eval-when (:load-toplevel :execute)
   (defparameter +xkbkeysymdb+ (make-hash-table)))
