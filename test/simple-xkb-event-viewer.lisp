@@ -262,7 +262,7 @@
   (let ((display (xlib:open-default-display)))
     (xlib:enable-xkeyboard display)
     (xlib::xkb/select-events display xlib::+use-core-kbd+
-                             '(:new-keyboard-notify :full)
+;                            '(:new-keyboard-notify :full)
                              '(:xkb/map-notify :full)
                              '(:state-notify :full)
                              '(:controls-notify :full)
