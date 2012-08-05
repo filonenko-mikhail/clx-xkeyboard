@@ -15,7 +15,7 @@
            :compat-map-notify
            :bell-notify
            :action-message
-           :access-x-notify
+           :access-xnotify
            :extension-device-notify)
   :errors (xkeyboard-error))
 
@@ -1069,7 +1069,7 @@
 
 (declare-event :new-keyboard-notify
   (card16 sequence)
-  ((or null card32) time)
+  (card32 time)
   (card8 device-id)
   (card8 old-device-id)
   (keycode min-key-code)
@@ -1083,7 +1083,7 @@
 (declare-event :xkb/map-notify    ; additional xkb is necessary, as
                                         ; :map-notify is already used by xkb
   (card16 sequence)
-  ((or null card32) time)
+  (card32 time)
   (card8 device-id)
   (butmask ptr-btn-actions)
   (mappart changed)
@@ -1107,7 +1107,7 @@
 
 (declare-event :state-notify
   (card16 sequence)
-  ((or null card32) time)
+  (card32 time)
   (card8 device-id)
   (keymask mods)
   (keymask base-mods)
@@ -1131,7 +1131,7 @@
 
 (declare-event :controls-notify
   (card16 sequence)
-  ((or null card32) time)
+  (card32 time)
   (card8 device-id)
   (card8 num-groups)
   (pad16 0)
@@ -1145,7 +1145,7 @@
 
 (declare-event :indicator-state-notify
   (card16 sequence)
-  ((or null card32) time)
+  (card32 time)
   (card8 device-id)
   (pad8 0)
   (pad16 0)
@@ -1154,7 +1154,7 @@
 
 (declare-event :indicator-map-notify
   (card16 sequence)
-  ((or null card32) time)
+  (card32 time)
   (card8 device-id)
   (pad8 0)
   (pad16 0)
@@ -1163,7 +1163,7 @@
 
 (declare-event :names-notify
   (card16 sequence)
-  ((or null card32)  timp)
+  (card32  timp)
   (card8 device-id)
   (pad8 0)
   (namedetail changed)
@@ -1182,7 +1182,7 @@
 
 (declare-event :compat-map-notify
   (card16 sequence)
-  ((or null card32) time)
+  (card32 time)
   (card8 device-id)
   (group changed-groups)
   (card16 first-si)
@@ -1191,7 +1191,7 @@
 
 (declare-event :bell-notify
   (card16 sequence)
-  ((or null card32) time)
+  (card32 time)
   (card8 device-id)
   (bellclassresult bell-class)
   (card8 bell-id)
@@ -1204,7 +1204,7 @@
 
 (declare-event :action-message
   (card16 sequence)
-  ((or null card32) time)
+  (card32 time)
   (card8 device-id)
   (keycode keycode)
   (boolean press)
@@ -1222,9 +1222,9 @@
   (card8 message-byte7)
   (card8 message-byte8))
 
-(declare-event :access-x-notify
+(declare-event :access-xnotify
   (card16 sequence)
-  ((or null card32) time)
+  (card32 time)
   (card8 device-id)
   (keycode keycode)
   (axndetail detail)
@@ -1233,7 +1233,7 @@
 
 (declare-event :extension-device-notify
   (card16 sequence)
-  ((or null card32) time)
+  (card32 time)
   (card8 device-id)
   (pad8 0)
   (xidetail reason)
@@ -1245,6 +1245,36 @@
   (card8 n-buttons)
   (xifeature supported)
   (xifeature unsupported))
+
+(defun xkb/select-events (display device-id &rest selectors)
+  (let*
+      ((affected-events (loop for selector in selectors
+                              collect (car selector)))
+       (cleared-events (loop for selector in selectors
+                             when (eql :clear (cadr selector))
+                               collect (car selector)))
+       (unconditionally-selected-events (loop for selector in selectors
+                                              when (eql :full (cadr selector))
+                                                collect (car selector))))
+    (format t "AA ~a~%BB ~a~%CC ~a~%" affected-events cleared-events unconditionally-selected-events)
+    (when (not (null (set-exclusive-or affected-events
+                                       (union cleared-events
+                                              unconditionally-selected-events))))
+      (error "bad selectors"))
+    (multiple-value-bind (affect-map map)
+        (cond
+          ((member :xkb/map-notify unconditionally-selected-events)
+           (values (mask-normalize 'mappart :full) (mask-normalize 'mappart :full)))
+          ((member :xkb/map-notify cleared-events)
+           (values (mask-normalize 'mappart :full) 0)))
+      (with-buffer-request (display (xkeyboard-opcode display))
+        (data +select-events+)
+        (devicespec device-id)
+        (eventtype (mask-normalize 'eventtype affected-events))
+        (eventtype (mask-normalize 'eventtype cleared-events))
+        (eventtype (mask-normalize 'eventtype unconditionally-selected-events))
+        (mappart affect-map)
+        (mappart map)))))
 
 ;;; Local Variables:
 ;;; indent-tabs-mode: nil
