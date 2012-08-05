@@ -8,7 +8,8 @@
   :version "0.1"
   :depends-on (:clx)
   :components ((:file "keysymdef")
-               (:file "xkeyboard" :depends-on ("keysymdef"))))
+               (:file "masktypes")
+               (:file "xkeyboard" :depends-on ("keysymdef" "masktypes"))))
 
 
 (asdf:defsystem :xkeyboard-test
