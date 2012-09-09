@@ -4,6 +4,29 @@
 
 (pushnew :clx-ext-xkeyboard *features*)
 
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defconstant +xkb-event-vector+
+    #(:new-keyboard-notify
+      :xkb/map-notify
+      :state-notify
+      :controls-notify
+      :indicator-state-notify
+      :indicator-map-notify
+      :names-notify
+      :compat-map-notify
+      :bell-notify
+      :action-message
+      :access-xnotify
+      :extension-device-notify))
+
+  (defun xkb-event-mapper (reply-buffer)
+    (with-buffer-input (reply-buffer :sizes (8 16 32))
+      (let ((code (read-card8 1)))
+        (if (< code (length +xkb-event-vector+))
+            (get-event-code
+             (svref +xkb-event-vector+ (read-card8 1)))
+            0)))))
+
 (define-extension "XKEYBOARD"
   :events (:new-keyboard-notify
            :xkb/map-notify
@@ -17,7 +40,9 @@
            :action-message
            :access-xnotify
            :extension-device-notify)
-  :errors (xkeyboard-error))
+  :errors (xkeyboard-error)
+  :events-mapper #'xkb-event-mapper
+  :events-external 1)
 
 (export '(+use-core-kbd+
           +use-core-ptr+
